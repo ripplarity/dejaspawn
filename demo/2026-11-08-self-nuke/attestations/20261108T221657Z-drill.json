@@ -1,0 +1,51 @@
+{
+  "version": "dejaspawn-receipt-1",
+  "command": "drill",
+  "started": "2026-11-08T22:16:56Z",
+  "ended": "2026-11-08T22:16:57Z",
+  "seconds": 1.8,
+  "platforms": {
+    "stripe": {
+      "mode": "REAL",
+      "detail": {
+        "base_mode": "REAL",
+        "restored": {
+          "subscriptions": 2
+        },
+        "failed": {
+          "subscriptions": 0
+        },
+        "outcomes": [
+          {
+            "type": "subscriptions",
+            "id": "(hashed in transcript)",
+            "outcome": "created"
+          },
+          {
+            "type": "subscriptions",
+            "id": "(hashed in transcript)",
+            "outcome": "created"
+          }
+        ],
+        "subscription_status": [
+          {
+            "id": "618615e972cb(old-hash)",
+            "restored_status": "trialing"
+          },
+          {
+            "id": "48650d585a0f(old-hash)",
+            "restored_status": "trialing"
+          }
+        ],
+        "payment_method": "UNRECOVERABLE (never exported by the platform)",
+        "status": "FULL"
+      },
+      "seconds": 1.8,
+      "minutes_to_recovery": 0.03,
+      "files": []
+    }
+  },
+  "pubkey": "E7CQSw9TpWzHheKwrv9IeUs7VyfiMWn1bJAmJVylhYc=",
+  "pubkey_sha256": "e7606d656411c28130854a23473c47d4e3799ebae67f5ba5fc0f11fc0c17e38c",
+  "signature": "wPSDGwayBN6bUZ9BcwJ/jzKrJAY4Solg5PC74XOHQpHuhcag8EwJnVfjCCbEbjhVQe9azY2KARpEjlgcQOcXBg=="
+}

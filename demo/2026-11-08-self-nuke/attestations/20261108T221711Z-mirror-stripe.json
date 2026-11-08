@@ -1,0 +1,43 @@
+{
+  "version": "dejaspawn-receipt-1",
+  "command": "mirror stripe",
+  "started": "2026-11-08T22:17:10Z",
+  "ended": "2026-11-08T22:17:11Z",
+  "seconds": 1.15,
+  "platforms": {
+    "stripe": {
+      "mode": "REAL-TEST",
+      "files": [
+        {
+          "path": "mirror/stripe/customers.jsonl",
+          "sha256": "a3df737ab90684722791390b485d5661ad82389f30e459ce5a848f30d3ffe21d",
+          "count": 3
+        },
+        {
+          "path": "mirror/stripe/subscriptions.jsonl",
+          "sha256": "eddd2650e6b329f3d9016d7517d5d87fa9bea8e28f88212f32ce03f046e41f68",
+          "count": 2
+        },
+        {
+          "path": "mirror/stripe/products.jsonl",
+          "sha256": "6441229eccce7da5293efe7e6a4605fd29b768d0d64819a7514af40d5609cd99",
+          "count": 2
+        },
+        {
+          "path": "mirror/stripe/prices.jsonl",
+          "sha256": "74ed4c1886119a61f28713c844a2f60ad1e4b05777931f0da52a3539aad7d181",
+          "count": 2
+        },
+        {
+          "path": "mirror/stripe/invoices.jsonl",
+          "sha256": "1098765b21f8c6c28dea5832cfe9a85d8afc7b219e275da7a0581fd29d43fa32",
+          "count": 4
+        }
+      ],
+      "invoice_window_days": 90
+    }
+  },
+  "pubkey": "E7CQSw9TpWzHheKwrv9IeUs7VyfiMWn1bJAmJVylhYc=",
+  "pubkey_sha256": "e7606d656411c28130854a23473c47d4e3799ebae67f5ba5fc0f11fc0c17e38c",
+  "signature": "A4fjWb2Iao9CKkr22ToNA91ACvedcObq9bzsOdaFzpwvbxt6wDFQdj4+PUCnjRJgVU/ZoOERTNPGs2/Ob86kDQ=="
+}
