@@ -31,7 +31,19 @@ def test_attest_verify_byte_identical_to_spec():
         return
     mine = os.path.join(ROOT, "dejaspawn", "attest_verify.py")
     h = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()
-    assert h(mine) == h(SPEC)
+    # compare against the spec's COMMITTED verifier (the working copy may be CRLF on Windows or mid-edit)
+    import subprocess
+
+    try:
+        committed = subprocess.run(
+            ["git", "-C", os.path.dirname(SPEC), "show", "HEAD:attest_verify.py"],
+            capture_output=True,
+            check=True,
+        ).stdout
+        spec_hash = hashlib.sha256(committed).hexdigest()
+    except Exception:
+        spec_hash = h(SPEC)
+    assert h(mine) == spec_hash
 
 
 def test_legacy_examples_verify_and_are_labelled():

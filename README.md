@@ -163,7 +163,7 @@ In `mirror/`, `receipts/` and `scratch/` on your machine, all gitignored. Copy `
 No. Platforms never export them, so they are listed as unrecoverable by design. Plan to re-collect payment methods and rotate secrets.
 
 **What does it cost?**
-Nothing. It runs locally under Apache-2.0, needs only Python, `cryptography` and `git`, and makes no calls except to the platforms you mirror.
+Nothing. It runs locally under Apache-2.0, needs only Python, `cryptography` and `git`, and makes no calls except to the platforms you mirror, plus the documentation URLs fetched when you explicitly run `exitscore --check-sources`.
 
 **My receipt says `NO-MIRROR` or `MOCK-UNAVAILABLE`. Did it pass?**
 That platform was not rehearsed. `drill` still exits 0, so read the mode, not the exit code.
