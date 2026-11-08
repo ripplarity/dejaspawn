@@ -100,3 +100,63 @@ def test_cf_both_403_no_receipt(env, monkeypatch):
         cli.main(["mirror", "cloudflare"])
     assert "Zone:DNS:Read" in str(e.value)
     assert _receipts() == []
+
+
+def _mk_mirror():
+    os.makedirs("mirror/stripe")
+    rows = {
+        "customers": [{"id": "cus_A", "email": "a@x.test"}],
+        "products": [{"id": "prod_A", "name": "P"}],
+        "prices": [{"id": "price_A", "product": "prod_A", "currency": "usd", "unit_amount": 5}],
+        "subscriptions": [
+            {"id": "sub_1", "customer": "cus_A", "status": "trialing", "collection_method": "charge_automatically",
+             "trial_end": 4102444800, "items": {"data": [{"price": {"id": "price_A"}}]}},
+            {"id": "sub_2", "customer": "cus_A", "status": "active", "trial_end": 1,
+             "items": {"data": [{"price": {"id": "price_A"}}]}},
+        ],
+    }
+    for k, v in rows.items():
+        with open(f"mirror/stripe/{k}.jsonl", "w") as f:
+            f.write("\n".join(json.dumps(x) for x in v) + "\n")
+
+
+def test_drill_partial_on_subscription_400(env, monkeypatch, capsys):
+    _mk_mirror()
+    sent = []
+
+    def fake(req, timeout=None):
+        if isinstance(req, str):
+            raise urllib.error.HTTPError(req, 404, "x", {}, io.BytesIO(b"{}"))
+        body = (req.data or b"").decode()
+        if req.full_url.endswith("/v1/subscriptions"):
+            sent.append(body)
+            if len(sent) == 2:
+                raise urllib.error.HTTPError(
+                    req.full_url, 400, "x", {},
+                    io.BytesIO(b'{"error":{"code":"resource_missing","message":"no payment method"}}'),
+                )
+            payload = {"id": "sub_new", "status": "trialing"}
+        else:
+            payload = {"id": "new_" + req.full_url.rsplit("/", 1)[-1], "data": []}
+
+        class R:
+            def read(self):
+                return json.dumps(payload).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+        return R()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake)
+    rc = cli.main(["drill", "--dry-run", "--card"])
+    assert rc == 3
+    assert "trial_end=4102444800" in sent[0] and "default_incomplete" in sent[0]
+    assert "trial_end" not in sent[1]
+    assert len(_receipts()) == 2
+    card = open([os.path.join("cards", f) for f in os.listdir("cards") if f.endswith(".md")][0]).read()
+    assert "PARTIAL" in card and "failed: HTTP 400 resource_missing" in card
+    assert "Unrecoverable by design" in card and "never exported" in card

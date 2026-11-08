@@ -72,6 +72,18 @@ def api_key(base):
     raise SystemExit("STRIPE_API_KEY is not set")
 
 
+class StripeError(SystemExit):
+    http = None
+    err_code = None
+
+
+def _reason(e):
+    """Reason class only: no body text, no keys."""
+    if isinstance(e, StripeError) and e.http:
+        return f"HTTP {e.http}" + (f" {e.err_code}" if isinstance(e.err_code, str) else "")
+    return type(e).__name__
+
+
 def _call(base, key, method, path, params=None):
     data = None
     url = base + path
@@ -88,9 +100,14 @@ def _call(base, key, method, path, params=None):
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         # never echo the key; body only
-        raise SystemExit(
-            f"stripe {method} {path} -> HTTP {e.code}: {e.read()[:300].decode('utf-8', 'replace')}"
-        )
+        body = e.read()[:300].decode("utf-8", "replace")
+        err = StripeError(f"stripe {method} {path} -> HTTP {e.code}: {body}")
+        err.http = e.code
+        try:
+            err.err_code = json.loads(body).get("error", {}).get("code")
+        except Exception:
+            err.err_code = None
+        raise err
     except urllib.error.URLError as e:
         raise SystemExit(f"stripe {method} {path} unreachable: {e.reason}")
 
@@ -169,23 +186,39 @@ def restore(src="mirror/stripe", base=None, key=None):
         raise SystemExit("STRIPE_RESTORE_KEY is not set")
     idmap = {}
     counts = {"customers": 0, "products": 0, "prices": 0, "subscriptions": 0}
+    failed = {k: 0 for k in counts}
+    outcomes = []
+    sub_status = []
 
     def flat(prefix, d):
         return {f"{prefix}[{k}]": str(v) for k, v in (d or {}).items()}
 
+    def attempt(kind, oid, params, path):
+        try:
+            r = _call(base, key, "POST", path, params)
+        except (Exception, SystemExit) as e:
+            failed[kind] += 1
+            outcomes.append(
+                {"type": kind, "id": oid, "outcome": "failed: " + _reason(e)}
+            )
+            return None
+        counts[kind] += 1
+        outcomes.append({"type": kind, "id": oid, "outcome": "created"})
+        return r
+
     for c in _read(os.path.join(src, "customers.jsonl")):
         p = {k: c[k] for k in ("email", "name", "description", "phone") if c.get(k)}
         p.update(flat("metadata", c.get("metadata")))
-        r = _call(base, key, "POST", "/v1/customers", p)
-        idmap[c["id"]] = r["id"]
-        counts["customers"] += 1
+        r = attempt("customers", c["id"], p, "/v1/customers")
+        if r:
+            idmap[c["id"]] = r["id"]
     for pr in _read(os.path.join(src, "products.jsonl")):
         p = {k: pr[k] for k in ("name", "description") if pr.get(k)}
         p["active"] = str(bool(pr.get("active", True))).lower()
         p.update(flat("metadata", pr.get("metadata")))
-        r = _call(base, key, "POST", "/v1/products", p)
-        idmap[pr["id"]] = r["id"]
-        counts["products"] += 1
+        r = attempt("products", pr["id"], p, "/v1/products")
+        if r:
+            idmap[pr["id"]] = r["id"]
     for pc in _read(os.path.join(src, "prices.jsonl")):
         p = {
             "currency": pc["currency"],
@@ -196,17 +229,49 @@ def restore(src="mirror/stripe", base=None, key=None):
         if pc.get("recurring"):
             p["recurring[interval]"] = pc["recurring"]["interval"]
             p["recurring[interval_count]"] = pc["recurring"].get("interval_count", 1)
-        r = _call(base, key, "POST", "/v1/prices", p)
-        idmap[pc["id"]] = r["id"]
-        counts["prices"] += 1
+        r = attempt("prices", pc["id"], p, "/v1/prices")
+        if r:
+            idmap[pc["id"]] = r["id"]
     for s in _read(os.path.join(src, "subscriptions.jsonl")):
-        items = ((s.get("items") or {}).get("data")) or []
-        p = {"customer": idmap.get(s.get("customer"), s.get("customer"))}
-        for i, it in enumerate(items):
-            pid = (it.get("price") or {}).get("id")
-            p[f"items[{i}][price]"] = idmap.get(pid, pid)
-            if it.get("quantity"):
-                p[f"items[{i}][quantity]"] = it["quantity"]
-        _call(base, key, "POST", "/v1/subscriptions", p)
-        counts["subscriptions"] += 1
-    return {"base_mode": "MOCK" if is_mock(base) else "REAL", "restored": counts}
+        p = subscription_params(s, idmap)
+        r = attempt("subscriptions", s.get("id"), p, "/v1/subscriptions")
+        if r is not None:
+            st = r.get("status")
+            row = {"id": s.get("id"), "restored_status": st}
+            if st != "trialing":
+                row["payment_method"] = PM_UNRECOVERABLE
+            sub_status.append(row)
+    out = {
+        "base_mode": "MOCK" if is_mock(base) else "REAL",
+        "restored": counts,
+        "failed": failed,
+        "outcomes": outcomes,
+        "subscription_status": sub_status,
+        "payment_method": PM_UNRECOVERABLE,
+    }
+    out["status"] = "PARTIAL" if any(failed.values()) else "FULL"
+    return out
+
+
+PM_UNRECOVERABLE = "UNRECOVERABLE (never exported by the platform)"
+
+
+def subscription_params(s, idmap, now=None):
+    """POST params for one mirrored subscription. Never invents a payment method."""
+    now = int(now if now is not None else time.time())
+    items = ((s.get("items") or {}).get("data")) or []
+    p = {
+        "customer": idmap.get(s.get("customer"), s.get("customer")),
+        "payment_behavior": "default_incomplete",
+    }
+    if s.get("collection_method"):
+        p["collection_method"] = s["collection_method"]
+    te = s.get("trial_end")
+    if isinstance(te, int) and te > now + 60:
+        p["trial_end"] = te
+    for i, it in enumerate(items):
+        pid = (it.get("price") or {}).get("id")
+        p[f"items[{i}][price]"] = idmap.get(pid, pid)
+        if it.get("quantity"):
+            p[f"items[{i}][quantity]"] = it["quantity"]
+    return p

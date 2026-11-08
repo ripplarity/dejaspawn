@@ -67,14 +67,17 @@ def _drill(a):
                     "files": [],
                 }
                 continue
-        r = fn()
+        try:
+            r = fn()
+        except (Exception, SystemExit) as e:
+            r = {"error": stripe._reason(e), "failed": {"all": 1}, "restored": {}, "status": "PARTIAL"}
         secs = time.time() - s
         if name == "stripe":
-            mode = r["base_mode"]
+            mode = r.get("base_mode") or "ERROR"
         elif name == "cloudflare":
             mode = "DRY-RUN" if a.dry_run else "REAL"
         elif name == "workspace":
-            mode = "VERIFY-ONLY" if r["ok"] else "FAIL"
+            mode = "VERIFY-ONLY" if r.get("ok") else "FAIL"
         else:
             mode = "REAL" if r and all(v == "ok" for v in r.values()) else "FAIL"
         plats[name] = {
@@ -92,8 +95,14 @@ def _drill(a):
 
         lp = _fin.last[: -len(".dsse.json")]
         print("card:", card.write_card(lp, _fin.last).replace("\\", "/"))
+    partial = any(
+        isinstance(p.get("detail"), dict) and p["detail"].get("status") == "PARTIAL"
+        for p in plats.values()
+    )
     bad = plats["github"]["mode"] == "FAIL" or plats.get("workspace", {}).get("mode") == "FAIL"
-    return 1 if bad else rc
+    if bad:
+        return 1
+    return 3 if partial else rc
 
 
 def _doctor():

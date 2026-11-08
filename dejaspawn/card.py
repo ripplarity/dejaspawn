@@ -13,6 +13,15 @@ UNRECOVERABLE = {
 }
 
 
+PM = "UNRECOVERABLE (never exported by the platform)"
+
+
+def _h(i):
+    import hashlib
+
+    return hashlib.sha256(str(i).encode()).hexdigest()[:12]
+
+
 def _counts(detail):
     if not isinstance(detail, dict) or not detail:
         return "-"
@@ -38,8 +47,17 @@ def render(receipt, env_path=None):
     """receipt: legacy receipt dict. Returns (markdown, plaintext)."""
     plats = receipt["platforms"]
     mode = run_mode(plats)
+    status = (
+        "PARTIAL"
+        if any(
+            isinstance(p.get("detail"), dict) and p["detail"].get("status") == "PARTIAL"
+            for p in plats.values()
+        )
+        else "FULL"
+    )
     keyid = (env_path and keyid_from(env_path)) or receipt.get("pubkey_sha256", "?")
     rows = []
+    detail_tbl_fail = []
     for n, p in plats.items():
         m = p.get("minutes_to_recovery")
         rows.append(
@@ -51,10 +69,30 @@ def render(receipt, env_path=None):
                 UNRECOVERABLE.get(n, "see README section 6"),
             )
         )
+    detail_tbl = []
+    unrec = []
+    for n, p in plats.items():
+        d = p.get("detail")
+        if n == "stripe" and isinstance(d, dict) and "restored" in d:
+            f = d.get("failed") or {}
+            detail_tbl = [
+                (k, v, f.get(k, 0)) for k, v in d["restored"].items()
+            ]
+            unrec.append("payment methods: " + d.get("payment_method", PM))
+            for o in d.get("outcomes", []):
+                if o["outcome"] != "created":
+                    detail_tbl_fail.append(f"{o['type']} {_h(o['id'])}: {o['outcome']}")
+            for s in d.get("subscription_status", []):
+                detail_tbl_fail.append(
+                    f"subscription {_h(s['id'])}: restored_status={s['restored_status']}"
+                )
+            if d.get("error"):
+                detail_tbl_fail.append("error: " + d["error"])
     att = os.path.basename(env_path) if env_path else "(none)"
     md = [
         f"# Respawn card {receipt['ended'][:10]}",
         "",
+        f"Drill status: **{status}**",
         f"Drill mode: **{mode}** (per platform: "
         + ", ".join(f"{n}={p.get('mode')}" for n, p in plats.items())
         + ")",
@@ -64,6 +102,12 @@ def render(receipt, env_path=None):
         "|---|---|---|---|---|",
     ]
     md += [f"| {a} | {b} | {c} | {d} | {e} |" for a, b, c, d, e in rows]
+    if detail_tbl:
+        md += ["", "Stripe objects:", "", "| Type | Created | Failed |", "|---|---|---|"]
+        md += [f"| {k} | {c} | {f} |" for k, c, f in detail_tbl]
+        md += ["", "Unrecoverable by design: " + "; ".join(unrec)]
+        if detail_tbl_fail:
+            md += [""] + [f"- {x}" for x in detail_tbl_fail]
     md += [
         "",
         f"Attestation: `{att}`, keyid `{keyid}`",
@@ -77,6 +121,10 @@ def render(receipt, env_path=None):
     ]
     for a, b, c, d, e in rows:
         txt += [f"- {a} [{b}] came back: {c}; minutes: {d}", f"    unrecoverable: {e}"]
+    for k, c, f in detail_tbl:
+        txt.append(f"stripe {k}: created={c} failed={f}")
+    txt += [f"unrecoverable by design: {u}" for u in unrec]
+    txt += [f"- {x}" for x in detail_tbl_fail]
     txt += [f"attestation: {att}  keyid: {keyid}"]
     return "\n".join(md) + "\n", "\n".join(txt) + "\n"
 
