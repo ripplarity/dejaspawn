@@ -1,2 +1,31 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dejaspawn"
+version = "0.1.0"
+description = "Mirror and drill tooling for exit-ready SaaS accounts"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = ["cryptography"]
+authors = [{ name = "Ripplarity Inc.", email = "code@ripplarity.com" }]
+
+[project.urls]
+Homepage = "https://dejaspawn.com"
+Source = "https://github.com/ripplarity/dejaspawn"
+
+[project.scripts]
+dejaspawn = "dejaspawn.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dejaspawn*"]
+exclude = ["tests*", "mirror*", "receipts*", "scratch*", "cards*", "examples*"]
+
+[tool.setuptools.package-data]
+dejaspawn = ["fixtures/*"]

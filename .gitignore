@@ -4,3 +4,6 @@ receipts/
 __pycache__/
 exitscore.json
 cards/
+dist/
+build/
+*.egg-info
