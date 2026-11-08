@@ -2,15 +2,25 @@
   <img src="assets/logo.svg" width="112" alt="Deja Spawn">
 </p>
 
-<h1 align="center">Deja Spawn</h1>
+<h1 align="center">Deja Spawn: rehearse losing your accounts</h1>
+
+<p align="center">
+  <b>You've been here before.</b><br>
+  Rehearse losing your Stripe, Cloudflare and GitHub accounts, so that when it happens for real, it's a re-run.
+</p>
 
 <p align="center">
   <img src="assets/badges.svg" alt="Python 3.10+ · Stripe · Cloudflare · GitHub · ed25519-signed receipts · Apache-2.0">
 </p>
 
 <p align="center">
-  <b>You've been here before.</b><br>
-  Rehearse losing your Stripe, Cloudflare and GitHub accounts, so that when it happens for real, it's a re-run.
+  <a href="#2-quick-start">Quick start</a> · <a href="#3-what-it-mirrors-and-drills">How it works</a> · <a href="#8-evidence">Evidence</a> · <a href="#faq">FAQ</a>
+</p>
+
+<p align="center"><code>python -m dejaspawn drill --dry-run</code></p>
+
+<p align="center">
+  <img src="assets/hero.svg" width="880" alt="Terminal: dejaspawn drill --dry-run restores Stripe into a mock, rehearses the Cloudflare import without sending it, checks the GitHub mirror, total 0.006 min; then verify prints OK">
 </p>
 
 <table align="center">
@@ -140,6 +150,23 @@ python -m dejaspawn verify examples/drill_attestation_mock.dsse.json \
 - **Schedule:** `python -m dejaspawn drill --schedule monthly|weekly` installs a Windows Scheduled Task (`schtasks`) or a cron line, named `dejaspawn-drill`, that runs `drill --card --dry-run` from the current directory. `--unschedule` removes it. Add `--dry-run` to either to print the task or cron line without installing.
 - **Workspace mirror:** `python -m dejaspawn mirror workspace` reads Gmail (`messages.list`, `messages.get` format raw, scope `gmail.readonly`) and Drive (`files.list`, `files.export`/`get`, scope `drive.readonly`) into `mirror/workspace/<account-hash>/` with `manifest.json` (sha256 per file). Set `GOOGLE_OAUTH_CLIENT_JSON` to an installed-app client file; the token is cached only under `~/.dejaspawn/`. Re-runs are incremental (Gmail by historyId, Drive by modifiedTime). Without the client file it runs in FIXTURE mode on synthetic data and says so. Implementation: `dejaspawn/workspace.py`. The real path has not been exercised against a live account.
 - **Exit Score:** `python -m dejaspawn exitscore` prints, per platform, the share of the state classes it holds (customers, subscriptions, payment instruments, invoices, DNS, certs, code, issues, mail, files, secrets) that its documented export surface lets you take out (full = 1, partial = 0.5, none = 0), next to the latest drill mode, and writes `exitscore.json`. It is derived from vendor documentation, not measured against any vendor; every row carries its source URL, held in the table in `dejaspawn/exitscore.py`. All URLs were fetched and read on 2026-11-08 (HTTP 200). One row, Cloudflare certificates, is marked UNVERIFIED because its page does not state what can be exported; it is excluded from that platform's score. `python -m dejaspawn exitscore --check-sources` re-fetches every URL and prints reachable or unreachable per row.
+
+## FAQ
+
+**Will a drill touch my live accounts?**
+No. Stripe restores go into stripe-mock, and Cloudflare imports are written to `scratch/` with `--dry-run`. A live target needs `DEJASPAWN_ALLOW_REAL_RESTORE=1`, and a live Stripe key needs `DEJASPAWN_ALLOW_LIVE=1`.
+
+**Where do my mirrors live?**
+In `mirror/`, `receipts/` and `scratch/` on your machine, all gitignored. Copy `mirror/` somewhere the platforms cannot reach: a copy on the same account is not a safeguard.
+
+**Can it bring back card details or secrets?**
+No. Platforms never export them, so they are listed as unrecoverable by design. Plan to re-collect payment methods and rotate secrets.
+
+**What does it cost?**
+Nothing. It runs locally under Apache-2.0, needs only Python, `cryptography` and `git`, and makes no calls except to the platforms you mirror.
+
+**My receipt says `NO-MIRROR` or `MOCK-UNAVAILABLE`. Did it pass?**
+That platform was not rehearsed. `drill` still exits 0, so read the mode, not the exit code.
 
 ---
 
