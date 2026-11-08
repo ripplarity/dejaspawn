@@ -86,7 +86,12 @@ def _drill(a):
         try:
             r = fn()
         except (Exception, SystemExit) as e:
-            r = {"error": stripe._reason(e), "failed": {"all": 1}, "restored": {}, "status": "PARTIAL"}
+            r = {
+                "error": stripe._reason(e),
+                "failed": {"all": 1},
+                "restored": {},
+                "status": "PARTIAL",
+            }
         secs = time.time() - s
         if name == "stripe":
             mode = r.get("base_mode") or "ERROR"
@@ -115,7 +120,10 @@ def _drill(a):
         isinstance(p.get("detail"), dict) and p["detail"].get("status") == "PARTIAL"
         for p in plats.values()
     )
-    bad = plats["github"]["mode"] == "FAIL" or plats.get("workspace", {}).get("mode") == "FAIL"
+    bad = (
+        plats["github"]["mode"] == "FAIL"
+        or plats.get("workspace", {}).get("mode") == "FAIL"
+    )
     if bad:
         return 1
     return 3 if partial else rc
@@ -174,9 +182,16 @@ def main(argv=None):
     v.add_argument(
         "--expect-keyid", help="pin: signer keyid (sha256 of the raw public key)"
     )
+    e = sub.add_parser("evidence")
+    e.add_argument("--run", help="snapshot run id of the drill (default: latest drill)")
     sub.add_parser("doctor")
     a = ap.parse_args(argv)
     t0 = time.time()
+    if a.cmd == "evidence":
+        from . import evidence
+
+        print("evidence:", evidence.build(run=a.run).replace("\\", "/"))
+        return 0
     if a.cmd == "doctor":
         return _doctor()
     if a.cmd == "verify":
