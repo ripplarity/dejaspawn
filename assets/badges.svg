@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="612" height="22" viewBox="0 0 612 22" role="img" aria-label="Python 3.10+, Stripe, Cloudflare, GitHub, ed25519-signed receipts, Apache-2.0">
+  <style>text{font:600 11px -apple-system,Segoe UI,Helvetica,Arial,sans-serif;fill:#fff}</style>
+  <rect x="0" y="0" width="92" height="22" rx="4" fill="#1B0F3A"/><text x="46" y="15" text-anchor="middle">python 3.10+</text>
+  <rect x="98" y="0" width="214" height="22" rx="4" fill="#2A0E4A"/><text x="205" y="15" text-anchor="middle">Stripe &#183; Cloudflare &#183; GitHub</text>
+  <rect x="318" y="0" width="176" height="22" rx="4" fill="#0E7C86"/><text x="406" y="15" text-anchor="middle">ed25519-signed receipts</text>
+  <rect x="500" y="0" width="112" height="22" rx="4" fill="#2E7D5B"/><text x="556" y="15" text-anchor="middle">Apache-2.0</text>
+</svg>

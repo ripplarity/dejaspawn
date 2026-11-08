@@ -1,0 +1,50 @@
+{
+  "version": "dejaspawn-receipt-1",
+  "command": "drill",
+  "started": "2026-11-08T20:32:39Z",
+  "ended": "2026-11-08T20:32:39Z",
+  "seconds": 0.118,
+  "platforms": {
+    "stripe": {
+      "mode": "MOCK",
+      "detail": {
+        "base_mode": "MOCK",
+        "restored": {
+          "customers": 1,
+          "products": 1,
+          "prices": 1,
+          "subscriptions": 1
+        }
+      },
+      "seconds": 0.102,
+      "minutes_to_recovery": 0.002,
+      "files": []
+    },
+    "cloudflare": {
+      "mode": "DRY-RUN",
+      "detail": {
+        "zones": {
+          "example.test": {
+            "sent": false,
+            "scratch": "scratch/cloudflare/example.test.import.txt",
+            "records": 5
+          }
+        },
+        "dry_run": true
+      },
+      "seconds": 0.015,
+      "minutes_to_recovery": 0.0,
+      "files": []
+    },
+    "github": {
+      "mode": "NO-MIRROR",
+      "detail": {},
+      "seconds": 0,
+      "minutes_to_recovery": null,
+      "files": []
+    }
+  },
+  "pubkey": "E7CQSw9TpWzHheKwrv9IeUs7VyfiMWn1bJAmJVylhYc=",
+  "pubkey_sha256": "e7606d656411c28130854a23473c47d4e3799ebae67f5ba5fc0f11fc0c17e38c",
+  "signature": "CCJuNdVyUF4kHsp8kcuGyQgqsMdlo+3gZbvw3edOEZE/JpjbNFufUX3BT1eoC3L+vziF0PCO6Q3wXPAmVsZKDg=="
+}

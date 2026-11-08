@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Deja Spawn">
+  <title>Deja Spawn</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B0F3A"/><stop offset=".6" stop-color="#2A0E4A"/><stop offset="1" stop-color="#0E1B3D"/>
+    </linearGradient>
+    <radialGradient id="pad" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#7DF9FF" stop-opacity=".9"/><stop offset="1" stop-color="#7DF9FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="loop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF5FA2"/><stop offset=".5" stop-color="#FFB547"/><stop offset="1" stop-color="#7DF9FF"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#7DF9FF" stop-opacity=".85"/><stop offset="1" stop-color="#7DF9FF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="60" fill="url(#bg)"/>
+  <!-- the loop: you've been here before -->
+  <path d="M206 128 A78 78 0 1 1 182 71" fill="none" stroke="url(#loop)" stroke-width="15" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M165 80 L194 83 L189 54" fill="none" stroke="#7DF9FF" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- spawn point: a pad with a beam, and the figure rematerialising -->
+  <ellipse cx="128" cy="176" rx="44" ry="11" fill="url(#pad)"/>
+  <ellipse cx="128" cy="176" rx="34" ry="7" fill="none" stroke="#7DF9FF" stroke-width="4"/>
+  <path d="M94 176 L110 92 L146 92 L162 176 Z" fill="url(#beam)" opacity=".3"/>
+  <circle cx="128" cy="112" r="13" fill="#FFFFFF"/>
+  <path d="M106 166 Q128 120 150 166" fill="#FFFFFF"/>
+  <!-- pixel shards still assembling -->
+  <rect x="98" y="104" width="7" height="7" fill="#7DF9FF"/>
+  <rect x="152" y="96" width="6" height="6" fill="#FF5FA2"/>
+  <rect x="158" y="128" width="5" height="5" fill="#FFB547"/>
+  <rect x="92" y="136" width="5" height="5" fill="#FF5FA2"/>
+</svg>

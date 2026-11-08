@@ -1,0 +1,26 @@
+$ python -m dejaspawn mirror stripe
+mirror/stripe/customers.jsonl  count=1  sha256=1a7e651de90b122f
+mirror/stripe/subscriptions.jsonl  count=1  sha256=be850d9bef45bdeb
+mirror/stripe/products.jsonl  count=1  sha256=ca8d69c644823de9
+mirror/stripe/prices.jsonl  count=1  sha256=2006008aa214c5ee
+mirror/stripe/invoices.jsonl  count=1  sha256=8ee71098fc1f5083
+mode: MOCK
+receipt: receipts/20261108T174642Z-mirror-stripe.json
+$ python -m dejaspawn mirror cloudflare
+mirror/cloudflare/example.test.txt  count=5  sha256=e10a40b473a65b40
+mode: FIXTURE
+receipt: receipts/20261108T174642Z-mirror-cloudflare.json
+$ python -m dejaspawn mirror github --repo ripplarity/stillherd
+mirror/github/stillherd.refs.txt  count=1  sha256=8b426989c5efbf5d
+mirror/github/stillherd.issues.jsonl  count=0  sha256=e3b0c44298fc1c14
+mirror/github/stillherd.pulls.jsonl  count=0  sha256=e3b0c44298fc1c14
+mode: REAL
+receipt: receipts/20261108T174644Z-mirror-github.json
+$ python -m dejaspawn drill --dry-run
+stripe      MOCK       0.002 min  {'base_mode': 'MOCK', 'restored': {'customers': 1, 'products': 1, 'prices': 1, 'subscriptions': 1}}
+cloudflare  DRY-RUN    0.000 min  {'zones': {'example.test': {'sent': False, 'scratch': 'scratch/cloudflare/example.test.import.txt', 'records': 5}}, 'dry_run': True}
+github      REAL       0.003 min  {'stillherd.git': 'ok'}
+total         0.006 min
+receipt: receipts/20261108T174645Z-drill.json
+$ python -m dejaspawn verify examples/drill_receipt_mock_dejaspawn.json
+OK
