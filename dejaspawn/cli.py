@@ -8,6 +8,7 @@ from .receipt import verify_receipt, write_receipt
 def _fin(cmd, t0, platforms):
     p = write_receipt(cmd, t0, time.time(), platforms)
     print("receipt:", p.replace("\\", "/"))
+    _fin.last = p
     return 0
 
 
@@ -18,8 +19,17 @@ def _has_mirror(name):
         return os.path.exists("mirror/stripe/customers.jsonl")
     if name == "cloudflare":
         return os.path.exists("mirror/cloudflare/zones.json")
+    if name == "workspace":
+        return os.path.isdir("mirror/workspace")
     d = "mirror/github"
     return os.path.isdir(d) and any(x.endswith(".git") for x in os.listdir(d))
+
+
+def _ws_verify():
+    from . import workspace
+
+    ok, d = workspace.verify()
+    return dict(d, ok=ok)
 
 
 def _drill(a):
@@ -29,7 +39,7 @@ def _drill(a):
         ("stripe", lambda: stripe.restore()),
         ("cloudflare", lambda: cloudflare.restore(dry_run=a.dry_run)),
         ("github", lambda: github.fsck_all()),
-    )
+    ) + ((("workspace", _ws_verify),) if _has_mirror("workspace") else ())
     for name, fn in steps:
         s = time.time()
         if not _has_mirror(name):
@@ -63,6 +73,8 @@ def _drill(a):
             mode = r["base_mode"]
         elif name == "cloudflare":
             mode = "DRY-RUN" if a.dry_run else "REAL"
+        elif name == "workspace":
+            mode = "VERIFY-ONLY" if r["ok"] else "FAIL"
         else:
             mode = "REAL" if r and all(v == "ok" for v in r.values()) else "FAIL"
         plats[name] = {
@@ -75,7 +87,13 @@ def _drill(a):
         print(f"{name:11s} {mode:8s} {secs / 60:7.3f} min  {r}")
     print(f"total       {(time.time() - t0) / 60:7.3f} min")
     rc = _fin("drill", t0, plats)
-    return 1 if plats["github"]["mode"] == "FAIL" else rc
+    if a.card:
+        from . import card
+
+        lp = _fin.last[: -len(".dsse.json")]
+        print("card:", card.write_card(lp, _fin.last).replace("\\", "/"))
+    bad = plats["github"]["mode"] == "FAIL" or plats.get("workspace", {}).get("mode") == "FAIL"
+    return 1 if bad else rc
 
 
 def _doctor():
@@ -109,11 +127,16 @@ def main(argv=None):
     m = sub.add_parser("mirror").add_subparsers(dest="platform", required=True)
     m.add_parser("stripe").add_argument("--days", type=int, default=90)
     m.add_parser("cloudflare")
+    m.add_parser("workspace")
     m.add_parser("github").add_argument("--repo")
     d = sub.add_parser("drill")
     d.add_argument(
         "--dry-run", action="store_true", help="do not send the DNS import to the API"
     )
+    d.add_argument("--card", action="store_true", help="write cards/<date>.md and .txt")
+    d.add_argument("--schedule", choices=["monthly", "weekly"])
+    d.add_argument("--unschedule", action="store_true")
+    sub.add_parser("exitscore").add_argument("--check-sources", action="store_true")
     v = sub.add_parser("verify")
     v.add_argument("receipt")
     v.add_argument(
@@ -133,12 +156,26 @@ def main(argv=None):
             print("note:", x)
         print("OK" if ok else "FAIL")
         return 0 if ok else 1
+    if a.cmd == "exitscore":
+        from . import exitscore
+
+        return exitscore.run(check=a.check_sources)
     if a.cmd == "drill":
+        if a.schedule or a.unschedule:
+            from . import schedule
+
+            if a.unschedule:
+                return schedule.uninstall(dry_run=a.dry_run)
+            return schedule.install(a.schedule, dry_run=a.dry_run)
         return _drill(a)
     if a.platform == "stripe":
         r = stripe.mirror(days=a.days)
     elif a.platform == "cloudflare":
         r = cloudflare.mirror()
+    elif a.platform == "workspace":
+        from . import workspace
+
+        r = workspace.mirror()
     else:
         r = github.mirror(only=a.repo)
     for f in r["files"]:

@@ -104,7 +104,7 @@ Each run also writes `<receipt>.json.dsse.json`: a standard **DSSE envelope over
 | `CF_API_TOKEN` | zone and DNS read access; edit access only for a real restore |
 | `GITHUB_TOKEN` | optional for `--repo` on public repos |
 
-Keys are never logged or written to disk. The GitHub token reaches git through the environment, not the command line or the repo config.
+API keys and tokens passed by environment variable are never logged or written to disk. The GitHub token reaches git through the environment, not the command line or the repo config. One exception, by necessity of OAuth: the Workspace mirror stores the Google refresh token at `~/.dejaspawn/workspace_token.json` (mode 600 on POSIX; Windows ACLs are not changed, so protect that folder yourself). Revoke it at any time at https://myaccount.google.com/permissions (remove the app) and delete the file.
 
 ## 6. What it does not protect
 
@@ -112,7 +112,7 @@ Keys are never logged or written to disk. The GitHub token reaches git through t
 - **Stripe:** a restore recreates objects with new ids. Payment methods must be re-collected, and invoice history is mirrored but not re-created.
 - **Cloudflare:** DNS records only. Not Workers, Pages, rules or certificates.
 - **GitHub:** repositories, issues and PRs. Not Actions secrets, wikis, release assets or review comments.
-- **Google Workspace:** not covered yet.
+- **Google Workspace:** step 1 is read-only (Gmail raw messages, Drive files). There is no restore; the drill only verifies manifest hashes and counts (VERIFY-ONLY). Drive items without an export format, and Google-native types beyond Docs, Sheets and Slides, are skipped.
 
 ## 7. Scope and limits
 
@@ -133,6 +133,13 @@ python -m dejaspawn verify examples/drill_attestation_mock.dsse.json \
   --key 13b0904b0f53a56cc785e2b0aeff48794b3b5727e23169f56c9026255ca58587 \
   --expect-keyid e7606d656411c28130854a23473c47d4e3799ebae67f5ba5fc0f11fc0c17e38c   # OK
 ```
+
+## 9. Respawn card, schedule, Workspace, Exit Score
+
+- **Card:** `python -m dejaspawn drill --card` runs the drill and writes `cards/<date>.md` and `.txt`: per platform what came back, minutes to recovery, what is unrecoverable by design, the drill mode (MOCK, DRY-RUN or REAL), and the attestation file and keyid. Pass `--dry-run` to skip the DNS import.
+- **Schedule:** `python -m dejaspawn drill --schedule monthly|weekly` installs a Windows Scheduled Task (`schtasks`) or a cron line, named `dejaspawn-drill`, that runs `drill --card --dry-run` from the current directory. `--unschedule` removes it. Add `--dry-run` to either to print the task or cron line without installing.
+- **Workspace mirror:** `python -m dejaspawn mirror workspace` reads Gmail (`messages.list`, `messages.get` format raw, scope `gmail.readonly`) and Drive (`files.list`, `files.export`/`get`, scope `drive.readonly`) into `mirror/workspace/<account-hash>/` with `manifest.json` (sha256 per file). Set `GOOGLE_OAUTH_CLIENT_JSON` to an installed-app client file; the token is cached only under `~/.dejaspawn/`. Re-runs are incremental (Gmail by historyId, Drive by modifiedTime). Without the client file it runs in FIXTURE mode on synthetic data and says so. Implementation: `dejaspawn/workspace.py`. The real path has not been exercised against a live account.
+- **Exit Score:** `python -m dejaspawn exitscore` prints, per platform, the share of the state classes it holds (customers, subscriptions, payment instruments, invoices, DNS, certs, code, issues, mail, files, secrets) that its documented export surface lets you take out (full = 1, partial = 0.5, none = 0), next to the latest drill mode, and writes `exitscore.json`. It is derived from vendor documentation, not measured against any vendor; every row carries its source URL, held in the table in `dejaspawn/exitscore.py`. All URLs were fetched and read on 2026-11-08 (HTTP 200). One row, Cloudflare certificates, is marked UNVERIFIED because its page does not state what can be exported; it is excluded from that platform's score. `python -m dejaspawn exitscore --check-sources` re-fetches every URL and prints reachable or unreachable per row.
 
 ---
 
