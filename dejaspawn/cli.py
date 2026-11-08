@@ -135,7 +135,9 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     m = sub.add_parser("mirror").add_subparsers(dest="platform", required=True)
     m.add_parser("stripe").add_argument("--days", type=int, default=90)
-    m.add_parser("cloudflare")
+    m.add_parser("cloudflare").add_argument(
+        "--zones", help="comma-separated exact zone names; only these are mirrored"
+    )
     m.add_parser("workspace")
     m.add_parser("github").add_argument("--repo")
     d = sub.add_parser("drill")
@@ -180,7 +182,9 @@ def main(argv=None):
     if a.platform == "stripe":
         r = stripe.mirror(days=a.days)
     elif a.platform == "cloudflare":
-        r = cloudflare.mirror()
+        r = cloudflare.mirror(
+            only=[z for z in a.zones.split(",") if z] if a.zones else None
+        )
     elif a.platform == "workspace":
         from . import workspace
 

@@ -67,7 +67,8 @@ def _list_as_bind(token, zid):
         page += 1
 
 
-def mirror(out="mirror/cloudflare"):
+def mirror(out="mirror/cloudflare", only=None):
+    only = set(only) if only else None
     token = os.environ.get("CF_API_TOKEN")
     os.makedirs(out, exist_ok=True)
     items = []  # (zone name, id, text)
@@ -76,6 +77,8 @@ def mirror(out="mirror/cloudflare"):
         mode = "REAL"
         try:
             for z in zones(token):
+                if only is not None and z["name"] not in only:
+                    continue
                 try:
                     txt = _call(
                         token, "GET", f"/zones/{z['id']}/dns_records/export"
@@ -97,7 +100,7 @@ def mirror(out="mirror/cloudflare"):
     else:
         mode = "FIXTURE"
         for fn in sorted(os.listdir(FIXTURE_DIR)):
-            if fn.endswith(".txt"):
+            if fn.endswith(".txt") and (only is None or fn[:-4] in only):
                 items.append(
                     (
                         fn[:-4],
@@ -105,6 +108,10 @@ def mirror(out="mirror/cloudflare"):
                         open(os.path.join(FIXTURE_DIR, fn), encoding="utf-8").read(),
                     )
                 )
+    if only is not None:
+        missing = sorted(only - {i[0] for i in items})
+        if missing:
+            raise SystemExit("zones not found: " + ",".join(missing))
     files = []
     zone_ids = {}
     for name, zid, txt in items:
@@ -124,6 +131,8 @@ def mirror(out="mirror/cloudflare"):
     with open(os.path.join(out, "zones.json"), "w") as f:
         json.dump(zone_ids, f, indent=2)
     res = {"mode": mode, "files": files}
+    if only is not None:
+        res["zones_filter"] = sorted(only)
     if token:
         res["method"] = "+".join(sorted(methods)) or "export"
     return res

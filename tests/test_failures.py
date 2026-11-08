@@ -160,3 +160,16 @@ def test_drill_partial_on_subscription_400(env, monkeypatch, capsys):
     card = open([os.path.join("cards", f) for f in os.listdir("cards") if f.endswith(".md")][0]).read()
     assert "PARTIAL" in card and "failed: HTTP 400 resource_missing" in card
     assert "Unrecoverable by design" in card and "never exported" in card
+
+
+def test_cloudflare_zones_filter(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("CF_API_TOKEN", raising=False)
+    fx = sorted(f[:-4] for f in os.listdir(cloudflare.FIXTURE_DIR) if f.endswith(".txt"))
+    keep = fx[0]
+    r = cloudflare.mirror(only=[keep])
+    assert [f["path"].split("/")[-1] for f in r["files"]] == [keep + ".txt"]
+    assert r["zones_filter"] == [keep]
+    assert list(json.load(open("mirror/cloudflare/zones.json"))) == [keep]
+    with pytest.raises(SystemExit):
+        cloudflare.mirror(only=["nope.invalid"])
