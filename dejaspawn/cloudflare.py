@@ -5,6 +5,7 @@ import urllib.error
 import urllib.request
 import uuid
 
+from . import snapshots
 from .receipt import sha256_file
 
 API = "https://api.cloudflare.com/client/v4"
@@ -70,7 +71,6 @@ def _list_as_bind(token, zid):
 def mirror(out="mirror/cloudflare", only=None):
     only = set(only) if only else None
     token = os.environ.get("CF_API_TOKEN")
-    os.makedirs(out, exist_ok=True)
     items = []  # (zone name, id, text)
     methods = set()
     if token:
@@ -112,11 +112,13 @@ def mirror(out="mirror/cloudflare", only=None):
         missing = sorted(only - {i[0] for i in items})
         if missing:
             raise SystemExit("zones not found: " + ",".join(missing))
-    files = []
-    zone_ids = {}
-    for name, zid, txt in items:
+    for name, _z, _t in items:
         if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
             raise SystemExit("unsafe zone name")
+    files = []
+    zone_ids = {}
+    rid, out = snapshots.new_run(out)
+    for name, zid, txt in items:
         fp = os.path.join(out, name + ".txt")
         with open(fp, "w", encoding="utf-8", newline="\n") as f:
             f.write(txt)
@@ -130,7 +132,8 @@ def mirror(out="mirror/cloudflare", only=None):
         )
     with open(os.path.join(out, "zones.json"), "w") as f:
         json.dump(zone_ids, f, indent=2)
-    res = {"mode": mode, "files": files}
+    snapshots.publish(os.path.dirname(out), rid)
+    res = {"mode": mode, "files": files, "run": rid}
     if only is not None:
         res["zones_filter"] = sorted(only)
     if token:
@@ -174,7 +177,8 @@ def import_zone(zone_id, name, text, dry_run=True, scratch="scratch/cloudflare")
     return {"sent": True, "records": count_records(text)}
 
 
-def restore(src="mirror/cloudflare", dry_run=True):
+def restore(src="mirror/cloudflare", dry_run=True, run=None):
+    src = snapshots.resolve(src, run) or src
     ids = json.load(open(os.path.join(src, "zones.json")))
     res = {}
     for name, zid in ids.items():

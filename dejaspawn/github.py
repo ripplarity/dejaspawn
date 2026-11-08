@@ -6,6 +6,7 @@ import subprocess
 import urllib.error
 import urllib.request
 
+from . import snapshots
 from .receipt import sha256_file
 
 API = "https://api.github.com"
@@ -71,8 +72,27 @@ def repo_list(token, only):
 
 def mirror(out="mirror/github", only=None):
     token = os.environ.get("GITHUB_TOKEN")
-    os.makedirs(out, exist_ok=True)
+    base = out
+    prev = snapshots.resolve(base)
+    rid, out = snapshots.new_run(base)
+    try:
+        r = _mirror_into(out, prev, token, only)
+    except BaseException:
+        snapshots.discard(out)
+        raise
+    snapshots.publish(base, rid)
+    r["run"] = rid
+    return r
+
+
+def _mirror_into(out, prev, token, only):
+    import shutil
+
     files = []
+    if prev:  # start from the previous clones so `remote update` stays incremental
+        for d in os.listdir(prev):
+            if d.endswith(".git"):
+                shutil.copytree(os.path.join(prev, d), os.path.join(out, d))
     for full in repo_list(token, only):
         name = full.split("/")[1]
         gd = os.path.join(out, name + ".git")
@@ -105,9 +125,10 @@ def mirror(out="mirror/github", only=None):
     return {"mode": "REAL", "authenticated": bool(token), "files": files}
 
 
-def fsck_all(src="mirror/github"):
+def fsck_all(src="mirror/github", run=None):
+    src = snapshots.resolve(src, run) or src
     res = {}
-    for d in sorted(os.listdir(src)):
+    for d in sorted(os.listdir(src)) if os.path.isdir(src) else []:
         if d.endswith(".git"):
             try:
                 _git(["fsck", "--no-progress"], cwd=os.path.join(src, d))

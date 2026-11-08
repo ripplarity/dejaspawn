@@ -6,14 +6,14 @@ import os
 from .receipt import run_mode
 
 UNRECOVERABLE = {
-    "stripe": "card tokens and PANs are never exported by the API (payment methods must be re-collected); webhook signing secrets; Radar rules",
+    "stripe": "card data and payment methods: not available via the API; card data moves only by a Stripe-mediated transfer to another PCI DSS Level 1 processor (see docs.stripe.com/get-started/data-migrations/pan-export), so a self-serve restore cannot recreate payment methods; webhook signing secrets; Radar rules",
     "cloudflare": "certificates (private keys are not retrievable) and Workers",
     "github": "Actions secrets and packages",
     "workspace": "no restore in step 1 (VERIFY-ONLY): the drill checks manifest hashes and counts only",
 }
 
 
-PM = "UNRECOVERABLE (never exported by the platform)"
+PM = "UNRECOVERABLE ("+'not available via the API; card data moves only by a Stripe-mediated transfer to another PCI DSS Level 1 processor (see docs.stripe.com/get-started/data-migrations/pan-export), so a self-serve restore cannot recreate payment methods'+")"
 
 
 def _h(i):

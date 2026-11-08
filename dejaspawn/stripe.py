@@ -6,6 +6,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from . import snapshots
 from .receipt import sha256_file
 
 DEFAULT_BASE = "http://localhost:12111"
@@ -130,10 +131,7 @@ def mirror(out="mirror/stripe", days=90):
         )
     base = base_url()
     key = api_key(base)
-    os.makedirs(out, exist_ok=True)
-    tmp = out.rstrip("/\\") + ".tmp"
-    shutil.rmtree(tmp, ignore_errors=True)
-    os.makedirs(tmp)
+    rid, tmp = snapshots.new_run(out)
     since = int(time.time()) - days * 86400
     files = []
     for name, path, windowed in RESOURCES:
@@ -146,19 +144,18 @@ def mirror(out="mirror/stripe", days=90):
                     f.write(json.dumps(o, sort_keys=True) + "\n")
                     n += 1
         except BaseException:
-            shutil.rmtree(tmp, ignore_errors=True)  # old mirror stays intact
+            snapshots.discard(tmp)  # earlier snapshots stay intact
             raise
         files.append({"path": fp, "sha256": None, "count": n})
-    for f in files:  # every page fetched: swap in
-        dest = os.path.join(out, os.path.basename(f["path"]))
-        os.replace(f["path"], dest)
-        f["path"] = dest.replace("\\", "/")
-        f["sha256"] = sha256_file(dest)
-    shutil.rmtree(tmp, ignore_errors=True)
+    for f in files:  # every page fetched: hash and publish
+        f["path"] = f["path"].replace("\\", "/")
+        f["sha256"] = sha256_file(f["path"])
+    snapshots.publish(out, rid)
     return {
         "mode": label(base),
         "files": files,
         "invoice_window_days": days,
+        "run": rid,
     }
 
 
@@ -168,8 +165,9 @@ def _read(path):
     return [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
 
 
-def restore(src="mirror/stripe", base=None, key=None):
+def restore(src="mirror/stripe", base=None, key=None, run=None):
     """Recreate customers, products, prices, subscriptions. Refuses a non-local target unless explicitly allowed."""
+    src = snapshots.resolve(src, run) or src
     base = base or os.environ.get("DEJASPAWN_STRIPE_RESTORE_BASE", DEFAULT_BASE).rstrip(
         "/"
     )
@@ -253,7 +251,7 @@ def restore(src="mirror/stripe", base=None, key=None):
     return out
 
 
-PM_UNRECOVERABLE = "UNRECOVERABLE (never exported by the platform)"
+PM_UNRECOVERABLE = "UNRECOVERABLE ("+'not available via the API; card data moves only by a Stripe-mediated transfer to another PCI DSS Level 1 processor (see docs.stripe.com/get-started/data-migrations/pan-export), so a self-serve restore cannot recreate payment methods'+")"
 
 
 def subscription_params(s, idmap, now=None):

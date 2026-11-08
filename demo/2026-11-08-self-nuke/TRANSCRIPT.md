@@ -78,7 +78,7 @@ Subscriptions before: 618615e972cb trialing, 48650d585a0f trialing (both charge_
 
 ### Step 4 RESPAWN (22:14:15Z to 22:14:19Z, 4 s), PARTIAL: subscriptions NOT recreated
 Command: `DEJASPAWN_ALLOW_REAL_RESTORE=1 STRIPE_API_KEY=<ENV> STRIPE_RESTORE_KEY=<ENV> DEJASPAWN_STRIPE_RESTORE_BASE=https://api.stripe.com python -m dejaspawn drill --dry-run --card` (--dry-run keeps the Cloudflare step to scratch files; the GitHub step is fsck only).
-Result: exit 1. stripe.restore() created customers, product and price, then `POST /v1/subscriptions` returned HTTP 400 resource_missing: "This customer has no attached payment source or default payment method." (stripe.py restore(), subscription loop near line 210: it sends only customer + items, drops trial_end, and the API never exports payment methods).
+Result: exit 1. stripe.restore() created customers, product and price, then `POST /v1/subscriptions` returned HTTP 400 resource_missing: "This customer has no attached payment source or default payment method." (stripe.py restore(), subscription loop near line 210: it sends only customer + items, drops trial_end, and payment methods are not available via the API; card data moves only by a Stripe-mediated transfer to another PCI DSS Level 1 processor (see docs.stripe.com/get-started/data-migrations/pan-export), so a self-serve restore cannot recreate payment methods).
 Recreated (old-id-hash -> new-id-hash):
 - customers 3/3: 89a76f5b83db -> c7128477acab; 94ea1e312712 -> 7786b3af60e7; 73bbba7e6c0c -> 235841c2208c
 - product 1/1: 97cffb66bc9e -> 2f1b31a7be26
@@ -89,12 +89,13 @@ No drill attestation or card was produced (the command aborted before the receip
 Possible fix (not applied, needs a decision): send trial_end (or attach a test payment method to the new customer) in the restore, then re-run only the subscriptions step.
 
 ### Step 4b SUBSCRIPTIONS RERUN with patched restore (22:16:50Z, 0.03 min), dejaspawn (shipped as 3b9455a)
-Fix: restore sends `trial_end` (mirror value, only if future) + `payment_behavior=default_incomplete` + `collection_method`; per-object outcomes; drill PARTIAL/exit 3; receipt and card always written. Payment method stays UNRECOVERABLE (never exported by the platform); none fabricated.
+Fix: restore sends `trial_end` (mirror value, only if future) + `payment_behavior=default_incomplete` + `collection_method`; per-object outcomes; drill PARTIAL/exit 3; receipt and card always written. Payment method stays UNRECOVERABLE (not available via the API; card data moves only by a Stripe-mediated transfer to another PCI DSS Level 1 processor (see docs.stripe.com/get-started/data-migrations/pan-export), so a self-serve restore cannot recreate payment methods); none fabricated.
 Customers mapped old -> new by email; price mapped by amount/currency (only active price). Real restore base, DEJASPAWN_ALLOW_REAL_RESTORE=1, keys from <secrets file> (not printed).
 Subscriptions 0 -> 2 (old-id-hash -> new-id-hash, outcome, status; trial_end sent = yes for both):
 - 618615e972cb -> df945aabc9af: created, status trialing
 - 48650d585a0f -> 2ce13b882150: created, status trialing
 Attestation: attestations/20261108T221657Z-drill.json.dsse.json verifies OK with the pinned keyid e7606d65...e38c (receipt + card respawn_card_2026-11-08_step4b.md copied). Note: this receipt covers the subscription step only (written via write_receipt), not a full drill.
+The signed receipt 20261108T221657Z-drill.json records the payment-method outcome with the wording used at the time ("never exported by the platform"). That wording was corrected on 2026-11-08 after checking docs.stripe.com/get-started/data-migrations/pan-export: card data is not available via the API but can be migrated by a Stripe-mediated transfer to another PCI DSS Level 1 processor. The receipt is kept unaltered because it is signed.
 Re-mirror run after both existed: subscriptions.jsonl count=2 (the new ones), attestation 20261108T221711Z-mirror-stripe.json.dsse.json.
 
 ## Note on the pre-nuke Stripe mirror attestation (20261108T221012Z)

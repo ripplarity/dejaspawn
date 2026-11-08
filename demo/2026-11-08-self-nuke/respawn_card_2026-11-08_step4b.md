@@ -6,7 +6,7 @@ Total seconds: 1.8
 
 | Platform | Mode | Came back | Minutes to recovery | Unrecoverable by design |
 |---|---|---|---|---|
-| stripe | REAL | subscriptions=2 | 0.030 | card tokens and PANs are never exported by the API (payment methods must be re-collected); webhook signing secrets; Radar rules |
+| stripe | REAL | subscriptions=2 | 0.030 | card data and payment methods: not available via the API; card data moves only by a Stripe-mediated transfer to another PCI DSS Level 1 processor (see docs.stripe.com/get-started/data-migrations/pan-export), so a self-serve restore cannot recreate payment methods; webhook signing secrets; Radar rules |
 
 Stripe objects:
 
@@ -14,7 +14,7 @@ Stripe objects:
 |---|---|---|
 | subscriptions | 2 | 0 |
 
-Unrecoverable by design: payment methods: UNRECOVERABLE (never exported by the platform)
+Unrecoverable by design: payment methods: UNRECOVERABLE (not available via the API; card data moves only by a Stripe-mediated transfer to another PCI DSS Level 1 processor (see docs.stripe.com/get-started/data-migrations/pan-export), so a self-serve restore cannot recreate payment methods)
 
 - subscription eaad1dcbd7e9: restored_status=trialing
 - subscription 9a6ef0b79079: restored_status=trialing

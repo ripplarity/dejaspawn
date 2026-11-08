@@ -1,7 +1,7 @@
 import argparse
 import time
 
-from . import cloudflare, github, stripe
+from . import cloudflare, github, snapshots, stripe
 from .receipt import verify_receipt, write_receipt
 
 
@@ -12,23 +12,35 @@ def _fin(cmd, t0, platforms):
     return 0
 
 
-def _has_mirror(name):
+def _has_mirror(name, run=None):
     import os
 
+    try:
+        d = snapshots.resolve("mirror/" + name, run)
+    except SystemExit:  # that run id does not exist for this platform
+        return False
+    if not d:
+        return False
     if name == "stripe":
-        return os.path.exists("mirror/stripe/customers.jsonl")
+        return os.path.exists(os.path.join(d, "customers.jsonl"))
     if name == "cloudflare":
-        return os.path.exists("mirror/cloudflare/zones.json")
+        return os.path.exists(os.path.join(d, "zones.json"))
     if name == "workspace":
-        return os.path.isdir("mirror/workspace")
-    d = "mirror/github"
-    return os.path.isdir(d) and any(x.endswith(".git") for x in os.listdir(d))
+        return os.path.isdir(d)
+    return any(x.endswith(".git") for x in os.listdir(d))
 
 
-def _ws_verify():
+def _prune(keep):
+    for p in ("stripe", "cloudflare", "github", "workspace"):
+        gone, prot = snapshots.prune(p, keep)
+        print(f"{p}: deleted {len(gone)} {gone}; protected {prot if prot else '[]'}")
+    return 0
+
+
+def _ws_verify(run=None):
     from . import workspace
 
-    ok, d = workspace.verify()
+    ok, d = workspace.verify(run=run)
     return dict(d, ok=ok)
 
 
@@ -36,13 +48,17 @@ def _drill(a):
     t0 = time.time()
     plats = {}
     steps = (
-        ("stripe", lambda: stripe.restore()),
-        ("cloudflare", lambda: cloudflare.restore(dry_run=a.dry_run)),
-        ("github", lambda: github.fsck_all()),
-    ) + ((("workspace", _ws_verify),) if _has_mirror("workspace") else ())
+        ("stripe", lambda: stripe.restore(run=a.run)),
+        ("cloudflare", lambda: cloudflare.restore(dry_run=a.dry_run, run=a.run)),
+        ("github", lambda: github.fsck_all(run=a.run)),
+    ) + (
+        (("workspace", lambda: _ws_verify(a.run)),)
+        if _has_mirror("workspace", a.run)
+        else ()
+    )
     for name, fn in steps:
         s = time.time()
-        if not _has_mirror(name):
+        if not _has_mirror(name, a.run):
             print(f"{name:11s} NO-MIRROR  run: python -m dejaspawn mirror {name}")
             plats[name] = {
                 "mode": "NO-MIRROR",
@@ -140,11 +156,13 @@ def main(argv=None):
     )
     m.add_parser("workspace")
     m.add_parser("github").add_argument("--repo")
+    m.add_parser("prune").add_argument("--keep", type=int, required=True)
     d = sub.add_parser("drill")
     d.add_argument(
         "--dry-run", action="store_true", help="do not send the DNS import to the API"
     )
     d.add_argument("--card", action="store_true", help="write cards/<date>.md and .txt")
+    d.add_argument("--run", help="snapshot run id to drill (default: latest)")
     d.add_argument("--schedule", choices=["monthly", "weekly"])
     d.add_argument("--unschedule", action="store_true")
     sub.add_parser("exitscore").add_argument("--check-sources", action="store_true")
@@ -179,6 +197,10 @@ def main(argv=None):
                 return schedule.uninstall(dry_run=a.dry_run)
             return schedule.install(a.schedule, dry_run=a.dry_run)
         return _drill(a)
+    if a.platform == "prune":
+        if a.keep < 1:
+            raise SystemExit("--keep must be >= 1")
+        return _prune(a.keep)
     if a.platform == "stripe":
         r = stripe.mirror(days=a.days)
     elif a.platform == "cloudflare":

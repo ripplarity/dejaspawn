@@ -44,8 +44,11 @@ def test_stripe_error_leaves_old_mirror_and_no_receipt(env, monkeypatch):
     monkeypatch.setattr("urllib.request.urlopen", _err(401))
     with pytest.raises(SystemExit):
         cli.main(["mirror", "stripe"])
-    assert open("mirror/stripe/customers.jsonl").read() == '{"id":"old"}\n'
-    assert not os.path.exists("mirror/stripe.tmp")
+    old = os.path.join("mirror/stripe", open("mirror/stripe/latest").read().strip())
+    assert open(old + "/customers.jsonl").read() == '{"id":"old"}\n'
+    assert (
+        len(os.listdir("mirror/stripe")) == 2
+    )  # legacy snapshot + latest; failed run discarded
     for r in _receipts():
         assert verify_receipt(r)[0]
 
@@ -107,12 +110,25 @@ def _mk_mirror():
     rows = {
         "customers": [{"id": "cus_A", "email": "a@x.test"}],
         "products": [{"id": "prod_A", "name": "P"}],
-        "prices": [{"id": "price_A", "product": "prod_A", "currency": "usd", "unit_amount": 5}],
+        "prices": [
+            {"id": "price_A", "product": "prod_A", "currency": "usd", "unit_amount": 5}
+        ],
         "subscriptions": [
-            {"id": "sub_1", "customer": "cus_A", "status": "trialing", "collection_method": "charge_automatically",
-             "trial_end": 4102444800, "items": {"data": [{"price": {"id": "price_A"}}]}},
-            {"id": "sub_2", "customer": "cus_A", "status": "active", "trial_end": 1,
-             "items": {"data": [{"price": {"id": "price_A"}}]}},
+            {
+                "id": "sub_1",
+                "customer": "cus_A",
+                "status": "trialing",
+                "collection_method": "charge_automatically",
+                "trial_end": 4102444800,
+                "items": {"data": [{"price": {"id": "price_A"}}]},
+            },
+            {
+                "id": "sub_2",
+                "customer": "cus_A",
+                "status": "active",
+                "trial_end": 1,
+                "items": {"data": [{"price": {"id": "price_A"}}]},
+            },
         ],
     }
     for k, v in rows.items():
@@ -132,8 +148,13 @@ def test_drill_partial_on_subscription_400(env, monkeypatch, capsys):
             sent.append(body)
             if len(sent) == 2:
                 raise urllib.error.HTTPError(
-                    req.full_url, 400, "x", {},
-                    io.BytesIO(b'{"error":{"code":"resource_missing","message":"no payment method"}}'),
+                    req.full_url,
+                    400,
+                    "x",
+                    {},
+                    io.BytesIO(
+                        b'{"error":{"code":"resource_missing","message":"no payment method"}}'
+                    ),
                 )
             payload = {"id": "sub_new", "status": "trialing"}
         else:
@@ -157,19 +178,23 @@ def test_drill_partial_on_subscription_400(env, monkeypatch, capsys):
     assert "trial_end=4102444800" in sent[0] and "default_incomplete" in sent[0]
     assert "trial_end" not in sent[1]
     assert len(_receipts()) == 2
-    card = open([os.path.join("cards", f) for f in os.listdir("cards") if f.endswith(".md")][0]).read()
+    card = open(
+        [os.path.join("cards", f) for f in os.listdir("cards") if f.endswith(".md")][0]
+    ).read()
     assert "PARTIAL" in card and "failed: HTTP 400 resource_missing" in card
-    assert "Unrecoverable by design" in card and "never exported" in card
+    assert "Unrecoverable by design" in card and "not available via the API" in card
 
 
 def test_cloudflare_zones_filter(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("CF_API_TOKEN", raising=False)
-    fx = sorted(f[:-4] for f in os.listdir(cloudflare.FIXTURE_DIR) if f.endswith(".txt"))
+    fx = sorted(
+        f[:-4] for f in os.listdir(cloudflare.FIXTURE_DIR) if f.endswith(".txt")
+    )
     keep = fx[0]
     r = cloudflare.mirror(only=[keep])
     assert [f["path"].split("/")[-1] for f in r["files"]] == [keep + ".txt"]
     assert r["zones_filter"] == [keep]
-    assert list(json.load(open("mirror/cloudflare/zones.json"))) == [keep]
+    assert list(json.load(open(os.path.join("mirror/cloudflare", open("mirror/cloudflare/latest").read().strip(), "zones.json")))) == [keep]
     with pytest.raises(SystemExit):
         cloudflare.mirror(only=["nope.invalid"])

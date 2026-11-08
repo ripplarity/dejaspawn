@@ -9,11 +9,14 @@ import hashlib
 import http.server
 import json
 import os
+import shutil
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+
+from . import snapshots
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -178,8 +181,8 @@ def _load(d):
     return {"mode": "", "gmail": {}, "drive": {}, "files": []}
 
 
-def mirror_fixture():
-    d = os.path.join(ROOT, _sha(b"fixture-account")[:12])
+def mirror_fixture(root=ROOT):
+    d = os.path.join(root, _sha(b"fixture-account")[:12])
     m = _load(d)
     m["mode"] = "FIXTURE"
     for i in range(3):
@@ -195,10 +198,10 @@ def mirror_fixture():
     return d, m
 
 
-def mirror_real(client_json):
+def mirror_real(client_json, root=ROOT):
     tok = access_token(client_json)
     email = _get(tok, GMAIL + "/profile")
-    d = os.path.join(ROOT, _sha(email["emailAddress"].encode())[:12])
+    d = os.path.join(root, _sha(email["emailAddress"].encode())[:12])
     m = _load(d)
     m["mode"] = "REAL"
     have = {f["path"] for f in m["files"]}
@@ -275,11 +278,21 @@ def mirror_real(client_json):
 
 def mirror():
     cj = os.environ.get("GOOGLE_OAUTH_CLIENT_JSON")
-    d, m = mirror_real(cj) if cj else mirror_fixture()
+    prev = snapshots.resolve(ROOT)
+    rid, root = snapshots.new_run(ROOT)
+    try:
+        if prev:  # incremental: start from the previous snapshot's files
+            shutil.copytree(prev, root, dirs_exist_ok=True)
+        d, m = mirror_real(cj, root) if cj else mirror_fixture(root)
+    except BaseException:
+        snapshots.discard(root)
+        raise
+    snapshots.publish(ROOT, rid)
     mp = os.path.join(d, "manifest.json")
     n = len(m["files"])
     return {
         "mode": m["mode"],
+        "run": rid,
         "files": [
             {
                 "path": mp.replace("\\", "/"),
@@ -290,14 +303,15 @@ def mirror():
     }
 
 
-def verify(d=None):
+def verify(d=None, run=None):
     """VERIFY-ONLY: recompute every manifest hash and count. Returns (ok, detail)."""
+    snap = None if d else snapshots.resolve(ROOT, run)
     ds = (
         [d]
         if d
         else (
-            [os.path.join(ROOT, x) for x in os.listdir(ROOT)]
-            if os.path.isdir(ROOT)
+            [os.path.join(snap, x) for x in os.listdir(snap)]
+            if snap
             else []
         )
     )

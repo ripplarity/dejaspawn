@@ -32,7 +32,7 @@ def env(tmp_path, monkeypatch):
 def test_card_render():
     md, txt = card.render(RECEIPT)
     assert "Drill mode: **MOCK**" in md and "customers=2" in md and "dns_records=5" in md
-    assert "never exported" in md and "keyid `" + "ab" * 32 in md
+    assert "not available via the API" in md and "keyid `" + "ab" * 32 in md
     assert "RESPAWN CARD 2026-11-08" in txt
 
 
@@ -90,3 +90,12 @@ def test_check_sources_and_unverified(env, capsys):
     assert "unreachable" in out and "reachable" in out
     d = exitscore.compute()
     assert d["platforms"]["cloudflare"]["classes"]["certs"]["level"] == "UNVERIFIED"
+
+
+def test_unexportable_urls_are_checked_sources():
+    import re
+
+    from dejaspawn.exitscore import TABLE
+
+    urls = set(re.findall(r"https://\S+?(?=\s\|)", open("UNEXPORTABLE.md", encoding="utf-8").read()))
+    assert urls and urls <= {t[3] for t in TABLE}
