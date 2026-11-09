@@ -29,9 +29,9 @@ def _run(*args):
 def test_attest_verify_byte_identical_to_spec():
     if not os.path.exists(SPEC):
         return
-    # pinned: the spec REVISION this package ships (attest-spec 1.2); a moved spec HEAD is informational
+    # pinned: the spec REVISION this package ships (attest-spec 1.4); a moved spec HEAD is informational
     SHIPPED_SPEC_SHA = (
-        "0e5d6c62ee0f109e0afc165af5a0db730b29fd4dbf054685470d5a7728ae34ef"
+        "51da005156826521b9a55ecf2ad3b5eb2aeb8cf85fb9ba70f231bfce55403687"
     )
     mine = os.path.join(ROOT, "dejaspawn", "attest_verify.py")
     h = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()

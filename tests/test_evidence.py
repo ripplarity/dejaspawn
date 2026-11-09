@@ -49,7 +49,7 @@ def test_evidence_pack_verifies(env):
          "--expect-keyid", keyid, "--check-subjects", "."],
         cwd=d, capture_output=True, text=True,
     )
-    assert "VALID-SIGNATURE" in r.stdout and r.returncode in (0, 5), r.stderr
+    assert "VALID-SIGNATURE" in r.stdout and r.returncode == 0, r.stderr  # evidence/v1 is listed in attest-spec 1.4
     st = json.loads(__import__("base64").b64decode(
         json.load(open(d / "MANIFEST.json.dsse.json"))["payload"]))
     assert st["predicateType"] == "https://ripplarity.com/attestation/dejaspawn/evidence/v1"
