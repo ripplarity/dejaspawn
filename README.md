@@ -174,6 +174,9 @@ Nothing. It runs locally under Apache-2.0, needs only Python, `cryptography` and
 **My receipt says `NO-MIRROR` or `MOCK-UNAVAILABLE`. Did it pass?**
 That platform was not rehearsed. `drill` still exits 0, so read the mode, not the exit code.
 
+**How does this relate to Stillherd?**
+Stillherd protects the execution of work; Deja Spawn protects the systems behind it. Both sign their records in the same attestation format, verified by the same byte-identical verifier ([ripplarity/stillherd](https://github.com/ripplarity/stillherd)).
+
 ---
 
 <p align="center"><sub>Apache-2.0 · Copyright 2026 Ripplarity Inc.</sub></p>
